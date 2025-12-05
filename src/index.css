@@ -1,0 +1,140 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #000; /* default fallback */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography */
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+/* Buttons */
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.3s ease;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* ===== THEME SYSTEM ===== */
+
+/* Dark theme */
+.theme-dark {
+  background-color: #000;
+  color: #fff;
+}
+
+/* Neon theme */
+.theme-neon {
+  background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+  color: #e0f7ff;
+}
+
+/* Smooth transition for all themes */
+.theme-dark,
+.theme-neon {
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+/* Neon UI accents */
+.theme-neon header,
+.theme-neon aside,
+.theme-neon .card,
+.theme-neon section {
+  background-color: rgba(20, 20, 40, 0.9);
+  border: 1px solid rgba(0, 242, 255, 0.2);
+}
+
+/* Neon text glow utility */
+.neon-glow {
+  text-shadow: 0 0 5px #00f2ff,
+               0 0 10px #00f2ff,
+               0 0 20px #00f2ff,
+               0 0 40px #00f2ff;
+}
+
+/* ===== SCROLLBAR ===== */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+}
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.custom-scrollbar:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+
+/* 🔥 Subtle glowing animation for video hover preview */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 0, 70, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 0, 70, 0.6);
+  }
+}
+
+.glow-preview {
+  animation: pulseGlow 2.5s infinite ease-in-out;
+}
+.upload-modal {
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
