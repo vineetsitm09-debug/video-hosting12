@@ -12,7 +12,7 @@ import LoginRequiredModal from "./LoginRequiredModal";
 
 interface HeaderProps {
   theme: string;
-  setTheme: (t: string) => void;
+setTheme: React.Dispatch<React.SetStateAction<"neon" | "dark">>;
   q: string;
   setQ: (q: string) => void;
   themeCls: { pill: string; accent: string };
@@ -243,3 +243,4 @@ export default function Header({
     </>
   );
 }
+
