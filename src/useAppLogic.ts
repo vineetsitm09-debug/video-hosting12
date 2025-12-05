@@ -248,17 +248,12 @@ const fetchVideos = async () => {
   }, [currentVideo?.id]);
 
   // ---------------- THEME CLASS ----------------
-  const themeCls =
-    theme === "dark"
-      ? {
-          page: "bg-[#0f0f0f] text-[#e5e5e5]",
-          panel: "bg-[#181818] border-white/10",
-        }
-      : {
-          page: "bg-slate-950 text-slate-100",
-          panel: "bg-slate-900 border-cyan-500/20",
-        };
-
+const themeCls = {
+  page: theme === "dark" ? "bg-[#0d0d0d]" : "bg-[#090015]",
+  panel: theme === "dark" ? "bg-[#111]" : "bg-[#140028]",
+  pill: theme === "dark" ? "bg-white/10" : "bg-pink-600/40",
+  accent: theme === "dark" ? "text-white" : "text-pink-400",
+};
   // ---------------- RETURN EVERYTHING ----------------
   return {
     videos,
@@ -290,3 +285,4 @@ const fetchVideos = async () => {
     setWatchPos,
   };
 }
+
