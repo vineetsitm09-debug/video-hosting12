@@ -11,7 +11,8 @@ interface AuthContextProps {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextProps>({
+// ⭐ FIX: Export AuthContext
+export const AuthContext = createContext<AuthContextProps>({
   user: null,
   token: null,
   login: () => {},
@@ -28,17 +29,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  // Listen for Firebase auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
 
       if (firebaseUser) {
-        // 🧠 Get token and refresh it automatically
         const idToken = await getIdToken(firebaseUser, true);
         setToken(idToken);
 
-        // Refresh every 55 minutes (Firebase tokens expire ~1 hour)
         setInterval(async () => {
           const refreshedToken = await getIdToken(firebaseUser, true);
           setToken(refreshedToken);
@@ -47,11 +45,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setToken(null);
       }
     });
+
     return () => unsub();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login: signInWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login: signInWithGoogle,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
