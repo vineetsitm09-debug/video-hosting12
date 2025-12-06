@@ -105,53 +105,58 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
     // -----------------------------------------
 
     useEffect(() => {
-      const el = vRef.current;
-      if (!el || !video?.url) return;
+  const el = vRef.current;
+  if (!el || !video?.url) return;
 
+  try {
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+  } catch {}
+
+  let hls: Hls | null = null;
+
+  const safePlay = async () => {
+    try {
+      if (autoPlay) await el.play();
+    } catch {
       try {
-        el.pause();
-        el.removeAttribute("src");
-        el.load();
+        el.muted = true;
+        await el.play();
+        setTimeout(() => (el.muted = false), 300);
       } catch {}
+    }
+  };
 
-      let hls: Hls | null = null;
+  if (video.url.endsWith(".m3u8")) {
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(video.url);
+      hls.attachMedia(el);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => safePlay());
+    } else {
+      el.src = video.url;
+      el.addEventListener("loadedmetadata", safePlay, { once: true });
+    }
+  } else {
+    el.src = video.url;
+    safePlay();
+  }
 
-      const safePlay = async () => {
-        try {
-          if (autoPlay) await el.play();
-        } catch {
-          try {
-            el.muted = true;
-            await el.play();
-            setTimeout(() => (el.muted = false), 300);
-          } catch {}
-        }
-      };
+  const handlePlay = () => setPulseKey((k) => k + 1);
+  el.addEventListener("play", handlePlay);
 
-      if (video.url.endsWith(".m3u8")) {
-        if (Hls.isSupported()) {
-          hls = new Hls();
-          hls.loadSource(video.url);
-          hls.attachMedia(el);
-          hls.on(Hls.Events.MANIFEST_PARSED, () => safePlay());
-        } else {
-          el.src = video.url;
-          el.addEventListener("loadedmetadata", safePlay, { once: true });
-        }
-      } else {
-        el.src = video.url;
-        safePlay();
-      }
+  // ✅ FIXED CLEANUP FUNCTION
+  return () => {
+    el.removeEventListener("play", handlePlay);
 
-      // NEW — trigger ambient pulse
-      const handlePlay = () => setPulseKey((k) => k + 1);
-      el.addEventListener("play", handlePlay);
-
-      return () => {
-        el.removeEventListener("play", handlePlay);
-        hls?.destroy();
-      };
-    }, [video.url, autoPlay, vRef]);
+    if (hls) {
+      try {
+        hls.destroy();
+      } catch {}
+    }
+  };
+}, [video.url, autoPlay, vRef]);
 
     // -----------------------------------------
     // HANDLE ENDED
@@ -412,3 +417,4 @@ className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden 
 );
 
 export default VideoPlayer;
+
