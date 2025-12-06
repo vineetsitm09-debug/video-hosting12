@@ -11,14 +11,16 @@ import { useAuth } from "../context/AuthContext";
 import LoginRequiredModal from "./LoginRequiredModal";
 
 interface HeaderProps {
-  theme: string;
-setTheme: React.Dispatch<React.SetStateAction<"neon" | "dark">>;
+  theme: "dark" | "neon";
+  setTheme: (t: "dark" | "neon") => void;
   q: string;
-  setQ: (q: string) => void;
-  themeCls: { pill: string; accent: string };
+  setQ: (v: string) => void;
+  themeCls: any;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   handleUploadClick: () => void;
   uploading: boolean;
 }
+
 
 export default function Header({
   theme,
@@ -243,4 +245,5 @@ export default function Header({
     </>
   );
 }
+
 
