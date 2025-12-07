@@ -1,27 +1,42 @@
+// -------------------------------------------------------------------
+// VideoPlayer.tsx (FULLY FIXED VERSION)
+// -------------------------------------------------------------------
+
 import React, {
   useRef,
   useState,
   useCallback,
   useImperativeHandle,
   forwardRef,
-  useMemo,
   useEffect,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2 } from "lucide-react";
-import usePlayer from "./usePlayer";
-import Controls from "./Controls";
+import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import Hls from "hls.js";
 
-// -------------------------------------
-// FIXED TYPES
-// -------------------------------------
+import usePlayer from "./usePlayer";
+import Controls from "./Controls";
+
+// -------------------------------------------------------------------
+// REQUIRED FIXED TYPES
+// -------------------------------------------------------------------
+
+export type VideoItem = {
+  id: string;
+  title: string;
+  filename?: string;
+  thumbnail?: string;
+  uploader?: string;
+  created_at?: string;
+  status?: string;
+};
 
 export type Chapter = { time: number; title: string };
 
 export type VideoMeta = VideoItem & {
-  url: string;        // override for player
-  poster?: string;    // thumbnail preview
+  url: string;
+  poster?: string;
+  thumbnails_base?: string;
 };
 
 export type PlayerHandle = {
@@ -40,9 +55,9 @@ type Props = {
   className?: string;
 };
 
-// -----------------------------------------
-//           VIDEO PLAYER COMPONENT
-// -----------------------------------------
+// -------------------------------------------------------------------
+// VIDEO PLAYER COMPONENT
+// -------------------------------------------------------------------
 
 const VideoPlayer = forwardRef<PlayerHandle, Props>(
   (
@@ -56,8 +71,6 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
     },
     ref
   ) => {
-
-    // PLAYER HOOK
     const { vRef, state, actions } = usePlayer({ video, autoPlay, startTime });
 
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -67,13 +80,12 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
     const [dominantColor, setDominantColor] = useState("#0a0a0a");
     const [ambientEnabled] = useState(true);
 
-    const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hideTimer = useRef<NodeJS.Timeout | null>(null);
     const [pulseKey, setPulseKey] = useState(0);
 
-    // -----------------------------------------
-    // EXTRACT POSTER COLOR
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // Extract Ambient Poster Color
+    // -------------------------------------------------------------------
     useEffect(() => {
       if (!video?.poster) return;
 
@@ -92,6 +104,7 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
           cx.drawImage(img, 0, 0, 32, 18);
 
           const d = cx.getImageData(0, 0, 32, 18).data;
+
           let r = 0,
             g = 0,
             b = 0;
@@ -112,10 +125,9 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       };
     }, [video?.poster]);
 
-    // -----------------------------------------
-    // HLS INITIALIZATION — FIXED CLEANUP
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // Initialize HLS
+    // -------------------------------------------------------------------
     useEffect(() => {
       const el = vRef.current;
       if (!el || !video?.url) return;
@@ -156,10 +168,9 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       };
     }, [video.url, autoPlay]);
 
-    // -----------------------------------------
+    // -------------------------------------------------------------------
     // ENDED EVENT
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
     useEffect(() => {
       const el = vRef.current;
       if (!el) return;
@@ -170,10 +181,9 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       return () => el.removeEventListener("ended", fn);
     }, [onEnded]);
 
-    // -----------------------------------------
-    // FULLSCREEN
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // Fullscreen Toggle
+    // -------------------------------------------------------------------
     const toggleFullscreen = useCallback(() => {
       const wrapper = vRef.current?.parentElement;
       if (!wrapper) return;
@@ -187,13 +197,13 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       }
     }, []);
 
-    // -----------------------------------------
-    // KEYBOARD SHORTCUTS
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // Keyboard Shortcuts
+    // -------------------------------------------------------------------
     useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
-        if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName || "")) return;
+        if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName || ""))
+          return;
 
         switch (e.key.toLowerCase()) {
           case " ":
@@ -220,12 +230,11 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       return () => document.removeEventListener("keydown", onKey);
     }, [actions, toggleFullscreen]);
 
-    // -----------------------------------------
-    // AUTO-HIDE CONTROLS — FIXED CLEANUP
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // Auto Hide Controls
+    // -------------------------------------------------------------------
     const resetHide = useCallback(() => {
-      hideTimer.current && clearTimeout(hideTimer.current);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
 
       setShowControls(true);
       setShowCursor(true);
@@ -240,13 +249,14 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
 
     useEffect(() => {
       resetHide();
-      return () => hideTimer.current && clearTimeout(hideTimer.current);
+      return () => {
+        if (hideTimer.current) clearTimeout(hideTimer.current);
+      };
     }, [resetHide]);
 
-    // -----------------------------------------
-    // EXPOSE PUBLIC API
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // Expose API to Parent
+    // -------------------------------------------------------------------
     useImperativeHandle(ref, () => ({
       play: actions.play,
       pause: actions.pause,
@@ -254,10 +264,9 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       getState: () => state,
     }));
 
-    // -----------------------------------------
-    // RETURN JSX (IMPORTANT FIX)
-    // -----------------------------------------
-
+    // -------------------------------------------------------------------
+    // RENDER UI
+    // -------------------------------------------------------------------
     return (
       <motion.div
         key={video.url}
@@ -267,7 +276,7 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
         onMouseMove={resetHide}
         onMouseEnter={resetHide}
       >
-        {/* AMBIENT FLASH */}
+        {/* Ambient Glow */}
         {ambientEnabled && (
           <motion.div
             key={pulseKey}
@@ -286,7 +295,7 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
           />
         )}
 
-        {/* VIDEO ELEMENT */}
+        {/* VIDEO */}
         <video
           ref={vRef}
           className="relative z-10 w-full h-full object-cover bg-black"
@@ -299,7 +308,7 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
         {/* BUFFERING */}
         {state.isBuffering && (
           <div className="absolute inset-0 grid place-items-center z-50 bg-black/40">
-            <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+            <Loader2 className="w-10 h-10 animate-spin" />
           </div>
         )}
 
@@ -342,4 +351,3 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
 );
 
 export default VideoPlayer;
-
