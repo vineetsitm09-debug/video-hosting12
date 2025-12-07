@@ -145,11 +145,15 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       const handlePlay = () => setPulseKey((k) => k + 1);
       el.addEventListener("play", handlePlay);
 
-      return () => {
-        el.removeEventListener("play", handlePlay);
-        hls?.destroy();
-      };
-    }, [video.url, autoPlay]);
+     return () => {
+  el.removeEventListener("play", handlePlay);
+  if (hls) {
+    try {
+      hls.destroy();
+    } catch {}
+  }
+};
+
 
     // -----------------------------------------
     // ENDED EVENT
@@ -337,3 +341,4 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
 );
 
 export default VideoPlayer;
+
