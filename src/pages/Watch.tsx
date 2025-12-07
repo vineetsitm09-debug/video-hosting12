@@ -29,7 +29,7 @@ export default function Watch() {
       const raw = await res.json();
       const arr = Array.isArray(raw) ? raw : raw.videos || [];
 
-      const mapped = arr.map((v, i) => ({
+      arr.map((v: any, i: number) => ({
         id: v.id?.toString() || v.filename || i.toString(),
         title: v.title || v.filename?.replace(/\.[^/.]+$/, "") || "Untitled",
         url:
@@ -46,7 +46,7 @@ export default function Watch() {
 
       setVideos(mapped);
 
-      const found = mapped.find((v) => v.id === id);
+      const found = mapped.find((v: any) => v.id === id)
       setCurrent(found || mapped[0]);
       setLoading(false);
     };
@@ -128,3 +128,4 @@ export default function Watch() {
     </div>
   );
 }
+
