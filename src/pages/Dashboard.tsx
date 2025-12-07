@@ -4,7 +4,7 @@ export default function Dashboard() {
   const [videos, setVideos] = useState([]);
 
   const fetchVideos = async () => {
-    const res = await fetch("http://18.218.164.106:5000/videos");
+    const res = await fetch("/api/videos")
     const data = await res.json();
     setVideos(data);
   };
@@ -64,3 +64,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
