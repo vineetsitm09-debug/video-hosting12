@@ -28,9 +28,11 @@ export default function Header({
   q,
   setQ,
   themeCls,
+  fileInputRef,       // ✅ FIXED
   handleUploadClick,
   uploading,
 }: HeaderProps) {
+
   const { user, login, logout } = useAuth();
   const [openMenu, setOpenMenu] = useState(false);
   const [countryCode, setCountryCode] = useState<string>("");
@@ -245,6 +247,7 @@ export default function Header({
     </>
   );
 }
+
 
 
 
