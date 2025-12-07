@@ -1,4 +1,3 @@
-// src/components/VideoPlayer.tsx
 import React, {
   useRef,
   useState,
@@ -14,8 +13,14 @@ import usePlayer from "./usePlayer";
 import Controls from "./Controls";
 import Hls from "hls.js";
 
+// -------------------------------------
+// FIXED TYPES
+// -------------------------------------
+
 export type Chapter = { time: number; title: string };
+
 export type VideoMeta = {
+  id?: string; // ⭐ FIX ADDED
   url: string;
   title?: string;
   poster?: string;
@@ -39,26 +44,29 @@ type Props = {
 };
 
 // -----------------------------------------
-//            VIDEO PLAYER START
+//           VIDEO PLAYER COMPONENT
 // -----------------------------------------
 
 const VideoPlayer = forwardRef<PlayerHandle, Props>(
-  ({ video, autoPlay = true, startTime = 0, chapters = [], onEnded, className = "" }, ref) => {
+  (
+    { video, autoPlay = true, startTime = 0, chapters = [], onEnded, className = "" },
+    ref
+  ) => {
+    // PLAYER HOOK
     const { vRef, state, actions } = usePlayer({ video, autoPlay, startTime });
 
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showControls, setShowControls] = useState(true);
     const [showCursor, setShowCursor] = useState(true);
+
     const [dominantColor, setDominantColor] = useState("#0a0a0a");
-
     const [ambientEnabled] = useState(true);
-    const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // NEW — ambient flash
+    const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [pulseKey, setPulseKey] = useState(0);
 
     // -----------------------------------------
-    // EXTRACT DOMINANT POSTER COLOR
+    // EXTRACT POSTER COLOR
     // -----------------------------------------
 
     useEffect(() => {
@@ -76,24 +84,23 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
 
           cv.width = 32;
           cv.height = 18;
-
           cx.drawImage(img, 0, 0, 32, 18);
 
-          const data = cx.getImageData(0, 0, 32, 18).data;
-
+          const d = cx.getImageData(0, 0, 32, 18).data;
           let r = 0,
             g = 0,
             b = 0;
 
-          for (let i = 0; i < data.length; i += 12) {
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
+          for (let i = 0; i < d.length; i += 16) {
+            r += d[i];
+            g += d[i + 1];
+            b += d[i + 2];
           }
 
-          r = Math.round(r / (data.length / 12));
-          g = Math.round(g / (data.length / 12));
-          b = Math.round(b / (data.length / 12));
+          const count = d.length / 16;
+          r = Math.round(r / count);
+          g = Math.round(g / count);
+          b = Math.round(b / count);
 
           setDominantColor(`rgb(${r}, ${g}, ${b})`);
         } catch {}
@@ -101,66 +108,51 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
     }, [video?.poster]);
 
     // -----------------------------------------
-    // HLS INITIALIZATION
+    // HLS INITIALIZATION — FIXED CLEANUP
     // -----------------------------------------
 
     useEffect(() => {
-  const el = vRef.current;
-  if (!el || !video?.url) return;
+      const el = vRef.current;
+      if (!el || !video?.url) return;
 
-  try {
-    el.pause();
-    el.removeAttribute("src");
-    el.load();
-  } catch {}
+      let hls: Hls | null = null;
 
-  let hls: Hls | null = null;
+      const safePlay = async () => {
+        try {
+          if (autoPlay) await el.play();
+        } catch {
+          el.muted = true;
+          await el.play().catch(() => {});
+          setTimeout(() => (el.muted = false), 300);
+        }
+      };
 
-  const safePlay = async () => {
-    try {
-      if (autoPlay) await el.play();
-    } catch {
-      try {
-        el.muted = true;
-        await el.play();
-        setTimeout(() => (el.muted = false), 300);
-      } catch {}
-    }
-  };
+      if (video.url.endsWith(".m3u8")) {
+        if (Hls.isSupported()) {
+          hls = new Hls();
+          hls.loadSource(video.url);
+          hls.attachMedia(el);
+          hls.on(Hls.Events.MANIFEST_PARSED, safePlay);
+        } else {
+          el.src = video.url;
+          el.addEventListener("loadedmetadata", safePlay, { once: true });
+        }
+      } else {
+        el.src = video.url;
+        safePlay();
+      }
 
-  if (video.url.endsWith(".m3u8")) {
-    if (Hls.isSupported()) {
-      hls = new Hls();
-      hls.loadSource(video.url);
-      hls.attachMedia(el);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => safePlay());
-    } else {
-      el.src = video.url;
-      el.addEventListener("loadedmetadata", safePlay, { once: true });
-    }
-  } else {
-    el.src = video.url;
-    safePlay();
-  }
+      const handlePlay = () => setPulseKey((k) => k + 1);
+      el.addEventListener("play", handlePlay);
 
-  const handlePlay = () => setPulseKey((k) => k + 1);
-  el.addEventListener("play", handlePlay);
-
-  // ✅ FIXED CLEANUP FUNCTION
-// ✅ FIXED CLEANUP FUNCTION  
-return () => {
-  el.removeEventListener("play", handlePlay);
-
-  if (hls) {
-    try {
-      hls.destroy();
-    } catch {}
-  }
-};
-
+      return () => {
+        el.removeEventListener("play", handlePlay);
+        hls?.destroy();
+      };
+    }, [video.url, autoPlay]);
 
     // -----------------------------------------
-    // HANDLE ENDED
+    // ENDED EVENT
     // -----------------------------------------
 
     useEffect(() => {
@@ -168,6 +160,7 @@ return () => {
       if (!el) return;
 
       const fn = () => onEnded?.();
+
       el.addEventListener("ended", fn);
       return () => el.removeEventListener("ended", fn);
     }, [onEnded]);
@@ -223,11 +216,11 @@ return () => {
     }, [actions, toggleFullscreen]);
 
     // -----------------------------------------
-    // AUTO-HIDE CONTROLS
+    // AUTO-HIDE CONTROLS — FIXED CLEANUP
     // -----------------------------------------
 
-    const resetHideTimer = useCallback(() => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
+    const resetHide = useCallback(() => {
+      hideTimer.current && clearTimeout(hideTimer.current);
 
       setShowControls(true);
       setShowCursor(true);
@@ -237,46 +230,45 @@ return () => {
           setShowControls(false);
           setShowCursor(false);
         }
-      }, 2400);
+      }, 2500);
     }, [state.isPlaying]);
 
     useEffect(() => {
-      resetHideTimer();
+      resetHide();
       return () => hideTimer.current && clearTimeout(hideTimer.current);
-    }, [resetHideTimer]);
+    }, [resetHide]);
 
     // -----------------------------------------
-    // RENDER
+    // EXPOSE PUBLIC API
+    // -----------------------------------------
+
+    useImperativeHandle(ref, () => ({
+      play: actions.play,
+      pause: actions.pause,
+      seek: actions.seekAbs,
+      getState: () => state,
+    }));
+
+    // -----------------------------------------
+    // RETURN JSX (IMPORTANT FIX)
     // -----------------------------------------
 
     return (
       <motion.div
         key={video.url}
-className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden rounded-xl shadow-xl ${className} ${
-  showCursor ? "cursor-default" : "cursor-none"
-}`}
-
-        onMouseMove={resetHideTimer}
-        onMouseEnter={resetHideTimer}
+        className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden rounded-xl shadow-xl ${className} ${
+          showCursor ? "cursor-default" : "cursor-none"
+        }`}
+        onMouseMove={resetHide}
+        onMouseEnter={resetHide}
       >
-        {/* -----------------------------------------
-            AMBIENT FLASH (YouTube style)
-        ----------------------------------------- */}
+        {/* AMBIENT FLASH */}
         {ambientEnabled && (
           <motion.div
             key={pulseKey}
-            initial={{ opacity: 0, scale: 1, filter: "brightness(1) saturate(1)" }}
-            animate={{
-              opacity: [0, 1, 0.8, 0.5],
-              scale: [1, 1.15, 1.08, 1],
-              filter: [
-                "brightness(1) saturate(1)",
-                "brightness(2.5) saturate(1.7)",
-                "brightness(1.8) saturate(1.3)",
-                "brightness(1.2) saturate(1.1)",
-              ],
-            }}
-            transition={{ duration: 0.9, ease: "easeOut" }}
+            initial={{ opacity: 0, scale: 1 }}
+            animate={{ opacity: [0, 0.8, 0.4], scale: [1, 1.1, 1] }}
+            transition={{ duration: 0.8 }}
             className="absolute inset-[-30%] pointer-events-none"
             style={{
               background: `
@@ -285,36 +277,11 @@ className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden 
               `,
               mixBlendMode: "screen",
               filter: "blur(150px)",
-              zIndex: 0,
             }}
           />
         )}
 
-        {/* -----------------------------------------
-            BREATHING AMBIENT BACKGROUND
-        ----------------------------------------- */}
-        {ambientEnabled && (
-          <motion.div
-            aria-hidden
-            initial={{ opacity: 0.35, scale: 1 }}
-            animate={{ opacity: [0.35, 0.55, 0.35], scale: [1, 1.02, 1] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-[-25%] pointer-events-none"
-            style={{
-              background: `
-                radial-gradient(circle at 25% 40%, ${dominantColor} 12%, transparent 55%),
-                radial-gradient(circle at 75% 70%, ${dominantColor} 12%, transparent 55%)
-              `,
-              mixBlendMode: "screen",
-              filter: "blur(150px)",
-              zIndex: 0,
-            }}
-          />
-        )}
-
-        {/* -----------------------------------------
-            VIDEO ELEMENT
-        ----------------------------------------- */}
+        {/* VIDEO ELEMENT */}
         <video
           ref={vRef}
           className="relative z-10 w-full h-full object-cover bg-black"
@@ -324,67 +291,19 @@ className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden 
           onClick={actions.playPause}
         />
 
-        {/* -----------------------------------------
-            BUFFER FADE-IN
-        ----------------------------------------- */}
-        <AnimatePresence>
-          {state.isBuffering && (
-            <motion.div
-              className="absolute inset-0 bg-black z-20"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1 }}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* -----------------------------------------
-            PAUSE OVERLAY
-        ----------------------------------------- */}
-        <AnimatePresence>
-          {!state.isPlaying && !state.isBuffering && (
-            <motion.div
-              className="absolute inset-0 z-30 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              {video.title && (
-                <div className="text-white text-xl mb-4">{video.title}</div>
-              )}
-              <motion.button
-                whileHover={{ scale: 1.07 }}
-                className="w-20 h-20 rounded-full bg-gradient-to-tr from-pink-500 to-fuchsia-500 grid place-items-center shadow-2xl"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  actions.play();
-                }}
-              >
-                <Play className="w-10 h-10 text-white" />
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* -----------------------------------------
-            BUFFERING SPINNER
-        ----------------------------------------- */}
+        {/* BUFFERING */}
         {state.isBuffering && (
-          <div className="absolute inset-0 grid place-items-center z-40 bg-black/30">
+          <div className="absolute inset-0 grid place-items-center z-50 bg-black/40">
             <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
           </div>
         )}
 
-        {/* -----------------------------------------
-            CONTROLS
-        ----------------------------------------- */}
+        {/* CONTROLS */}
         {showControls && (
           <motion.div
-            className="absolute bottom-0 left-0 right-0 z-[50]"
+            className="absolute bottom-0 left-0 right-0 z-[60]"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25 }}
           >
             <Controls
@@ -416,7 +335,5 @@ className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden 
     );
   }
 );
-
-});   // ⭐ FIX ADDED — closes the forwardRef callback properly
 
 export default VideoPlayer;
