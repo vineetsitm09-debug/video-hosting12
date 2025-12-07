@@ -5,8 +5,8 @@ import Hls, { Level } from "hls.js";
 // Clamp helper
 const clamp = (n: number, min = 0, max = 1) => Math.min(max, Math.max(min, n));
 
+// FIXED IMPORT ⬇️  
 import type { VideoMeta } from "./VideoPlayer";
-
 
 export default function usePlayer({
   video,
@@ -29,9 +29,7 @@ export default function usePlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [levels, setLevels] = useState<Level[]>([]);
   const [currentLevel, setCurrentLevel] = useState<number | "auto">("auto");
-  const [subtitles, setSubtitles] = useState<{ id: number; label: string }[]>(
-    []
-  );
+  const [subtitles, setSubtitles] = useState<{ id: number; label: string }[]>([]);
   const [currentSubtitle, setCurrentSubtitle] =
     useState<number | "off">("off");
 
@@ -95,7 +93,6 @@ export default function usePlayer({
     }
     hlsRef.current = null;
 
-    // Reset player state
     setIsBuffering(true);
     setLevels([]);
     setSubtitles([]);
@@ -108,15 +105,12 @@ export default function usePlayer({
       if (autoPlay) el.play().catch(() => {});
     };
 
-    // Native HLS (Safari)
     if (el.canPlayType("application/vnd.apple.mpegurl")) {
       el.src = video.url;
       el.addEventListener("loadedmetadata", safeStart);
-      return () =>
-        el.removeEventListener("loadedmetadata", safeStart);
+      return () => el.removeEventListener("loadedmetadata", safeStart);
     }
 
-    // HLS.js
     if (video.url.endsWith(".m3u8") && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
@@ -151,7 +145,6 @@ export default function usePlayer({
       };
     }
 
-    // Fallback for MP4, WebM
     el.src = video.url;
     safeStart();
 
@@ -196,7 +189,6 @@ export default function usePlayer({
     };
   }, [video?.url]);
 
-  // ---- COMPACT STATE + ACTIONS ----
   const state = useMemo(
     () => ({
       isPlaying,
@@ -253,4 +245,3 @@ export default function usePlayer({
 
   return { vRef, state, actions };
 }
-
