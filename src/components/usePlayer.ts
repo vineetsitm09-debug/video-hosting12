@@ -5,8 +5,8 @@ import Hls, { Level } from "hls.js";
 // Clamp helper
 const clamp = (n: number, min = 0, max = 1) => Math.min(max, Math.max(min, n));
 
-// ⚠ Use VideoMeta, not VideoItem (this fixes TS2322)
-import type { VideoMeta } from "../VideoPlayer";
+import type { VideoMeta } from "./VideoPlayer";
+
 
 export default function usePlayer({
   video,
@@ -253,3 +253,4 @@ export default function usePlayer({
 
   return { vRef, state, actions };
 }
+
