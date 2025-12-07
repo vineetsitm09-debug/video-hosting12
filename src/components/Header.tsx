@@ -16,7 +16,7 @@ interface HeaderProps {
   q: string;
   setQ: (v: string) => void;
   themeCls: any;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleUploadClick: () => void;
   uploading: boolean;
 }
@@ -144,7 +144,7 @@ export default function Header({
           {/* 💡 Theme Toggle */}
           <button
             onClick={() =>
-              setTheme((t: string) => (t === "dark" ? "neon" : "dark"))
+              setTheme(theme === "dark" ? "neon" : "dark");
             }
             className={`px-4 h-9 rounded-full text-sm font-medium transition
               ${
@@ -245,5 +245,6 @@ export default function Header({
     </>
   );
 }
+
 
 
