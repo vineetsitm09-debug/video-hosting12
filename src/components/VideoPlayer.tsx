@@ -418,5 +418,3 @@ className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden 
 );
 
 export default VideoPlayer;
-
-
