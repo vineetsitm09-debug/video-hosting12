@@ -49,9 +49,17 @@ type Props = {
 
 const VideoPlayer = forwardRef<PlayerHandle, Props>(
   (
-    { video, autoPlay = true, startTime = 0, chapters = [], onEnded, className = "" },
+    {
+      video,
+      autoPlay = true,
+      startTime = 0,
+      chapters = [],
+      onEnded,
+      className = "",
+    },
     ref
   ) => {
+
     // PLAYER HOOK
     const { vRef, state, actions } = usePlayer({ video, autoPlay, startTime });
 
@@ -145,15 +153,11 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
       const handlePlay = () => setPulseKey((k) => k + 1);
       el.addEventListener("play", handlePlay);
 
-     return () => {
-  el.removeEventListener("play", handlePlay);
-  if (hls) {
-    try {
-      hls.destroy();
-    } catch {}
-  }
-};
-
+      return () => {
+        el.removeEventListener("play", handlePlay);
+        hls?.destroy();
+      };
+    }, [video.url, autoPlay]);
 
     // -----------------------------------------
     // ENDED EVENT
@@ -341,4 +345,3 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
 );
 
 export default VideoPlayer;
-
