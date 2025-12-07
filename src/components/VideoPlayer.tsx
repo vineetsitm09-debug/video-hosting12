@@ -147,16 +147,17 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
   el.addEventListener("play", handlePlay);
 
   // ✅ FIXED CLEANUP FUNCTION
-  return () => {
-    el.removeEventListener("play", handlePlay);
+// ✅ FIXED CLEANUP FUNCTION  
+return () => {
+  el.removeEventListener("play", handlePlay);
 
-    if (hls) {
-      try {
-        hls.destroy();
-      } catch {}
-    }
-  };
-}, [video.url, autoPlay, vRef]);
+  if (hls) {
+    try {
+      hls.destroy();
+    } catch {}
+  }
+};
+
 
     // -----------------------------------------
     // HANDLE ENDED
@@ -417,4 +418,5 @@ className={`relative w-full max-w-[1980px] aspect-video mx-auto overflow-hidden 
 );
 
 export default VideoPlayer;
+
 
