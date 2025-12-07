@@ -23,49 +23,75 @@ export default function Watch() {
   const [current, setCurrent] = useState<VideoItem | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // -----------------------------------------
+  // LOAD AND NORMALIZE VIDEOS
+  // -----------------------------------------
   useEffect(() => {
     const loadVideos = async () => {
-      const res = await fetch(`${API_URL}/videos`);
-      const raw = await res.json();
-      const arr = Array.isArray(raw) ? raw : raw.videos || [];
+      try {
+        const res = await fetch(`${API_URL}/videos`);
+        const raw = await res.json();
+        const arr = Array.isArray(raw) ? raw : raw.videos || [];
 
-      arr.map((v: any, i: number) => ({
-        id: v.id?.toString() || v.filename || i.toString(),
-        title: v.title || v.filename?.replace(/\.[^/.]+$/, "") || "Untitled",
-        url:
-          v.url ||
-          v.video_url ||
-          `${API_URL}/hls/${(v.filename || "").replace(/\.[^/.]+$/, "")}/master.m3u8`,
-        thumbnail:
-          v.thumbnail ||
-          `${API_URL}/hls/${(v.filename || "").replace(/\.[^/.]+$/, "")}/thumb_0001.jpg`,
-        uploader: v.uploader_email || "Unknown",
-        created_at: v.created_at,
-        status: v.status,
-      }));
+        // ⭐ FIXED: mapped is now defined correctly
+        const mapped: VideoItem[] = arr.map((v: any, i: number) => ({
+          id: v.id?.toString() || v.filename || i.toString(),
 
-      setVideos(mapped);
+          title:
+            v.title ||
+            v.filename?.replace(/\.[^/.]+$/, "") ||
+            "Untitled",
 
-      const found = mapped.find((v: any) => v.id === id)
-      setCurrent(found || mapped[0]);
-      setLoading(false);
+          url:
+            v.url ||
+            v.video_url ||
+            `${API_URL}/hls/${(v.filename || "").replace(/\.[^/.]+$/, "")}/master.m3u8`,
+
+          thumbnail:
+            v.thumbnail ||
+            `${API_URL}/hls/${(v.filename || "").replace(/\.[^/.]+$/, "")}/thumb_0001.jpg`,
+
+          uploader: v.uploader_email || "Unknown",
+          created_at: v.created_at,
+          status: v.status,
+          filename: v.filename,
+        }));
+
+        setVideos(mapped);
+
+        const found = mapped.find((v) => v.id === id);
+        setCurrent(found || mapped[0]);
+
+      } catch (err) {
+        console.error("Failed loading videos:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadVideos();
   }, [id]);
 
+  // -----------------------------------------
+  // LOADING STATE
+  // -----------------------------------------
   if (loading || !current)
     return <div className="p-6 text-gray-400">Loading...</div>;
 
+  // Next video logic
   const currentIndex = videos.findIndex((v) => v.id === current.id);
   const next = videos[currentIndex + 1];
 
+  // -----------------------------------------
+  // RENDER PAGE
+  // -----------------------------------------
   return (
     <div className="w-full flex gap-6">
-      {/* LEFT SIDE */}
+
+      {/* LEFT PANEL */}
       <div className="flex-1 flex flex-col">
 
-        {/* 🎥 FIXED 16:9 PLAYER CONTAINER */}
+        {/* 🎥 FIXED 16:9 YOUTUBE-LIKE PLAYER */}
         <div
           className="relative w-full rounded-xl overflow-hidden bg-black"
           style={{ aspectRatio: "16 / 9" }}
@@ -78,7 +104,7 @@ export default function Watch() {
           />
         </div>
 
-        {/* Title + Meta */}
+        {/* META */}
         <div className="p-4 text-white">
           <h2 className="text-xl font-semibold">{current.title}</h2>
           <p className="text-sm text-gray-400 mt-1">
@@ -90,11 +116,9 @@ export default function Watch() {
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
+      {/* RIGHT SIDEBAR */}
       <div className="w-80 flex-shrink-0">
 
-
-        {/* LIBRARY LIST */}
         <div className="rounded-2xl border shadow-lg bg-[#181818] p-3 h-[calc(100vh-180px)] overflow-y-auto">
           <h2 className="text-sm opacity-80 mb-3">Library</h2>
 
@@ -124,8 +148,8 @@ export default function Watch() {
             ))}
           </div>
         </div>
+
       </div>
     </div>
   );
 }
-
