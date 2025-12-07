@@ -1,288 +1,240 @@
+// src/useAppLogic.ts
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoItem } from "./types";
-import { clamp } from "./utils/format";
-import { useAuth } from "./context/AuthContext"; // ✅ Import Auth Context
+import { useAuth } from "./context/AuthContext";
 import { getAuth } from "firebase/auth";
 
-// 🌍 Backend API endpoint
 const API_URL = import.meta.env.VITE_API_BASE || "http://18.218.164.106:5000";
 
 export function useAppLogic() {
-  // ---------------- STATES ----------------
-  const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [theme, setTheme] = useState<"dark" | "neon">(
-    () => (localStorage.getItem("theme") as "dark" | "neon") || "dark"
-  );
+  // ---------------- STATES ----------------
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
 
-  const [autoplayNext, setAutoplayNext] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [q, setQ] = useState("");
+  const [theme, setTheme] = useState<"dark" | "neon">(
+    () => (localStorage.getItem("theme") as "dark" | "neon") || "dark"
+  );
 
-  // ✅ Get logged-in company info + token
-  const { token } = useAuth();
+  const [autoplayNext, setAutoplayNext] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // 🎬 Watch position (saved locally)
-  const [watchPos, setWatchPos] = useState<Record<string, { t: number; d: number }>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("watchPos") || "{}");
-    } catch {
-      return {};
-    }
-  });
+  const [toast, setToast] = useState<
+    { message: string; type: "success" | "error" } | null
+  >(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { token } = useAuth();
 
-  // “Up Next” overlay logic
-  const [upNextVisible, setUpNextVisible] = useState(false);
-  const [upNextCount, setUpNextCount] = useState(5);
-
-  // ---------------- FETCH VIDEOS ----------------
-const fetchVideos = async () => {
-  try {
-    const res = await fetch(`${API_URL}/videos`, {
-      headers: {
-        Authorization: `Bearer ${token}`, // ✅ Send JWT Token
-      },
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const result = await res.json(); // The response is { success: boolean, videos: VideoItem[] }
-
-    // 🛑 FIX: Ensure 'videos' property exists and is an array before mapping
-    if (!result.videos || !Array.isArray(result.videos)) {
-        console.error("Server response structure invalid:", result);
-        // Fallback to empty array to prevent application crash
-        setVideos([]);
-        return;
+  const [watchPos, setWatchPos] = useState<
+    Record<string, { t: number; d: number }>
+  >(() => {
+    try {
+      return JSON.parse(localStorage.getItem("watchPos") || "{}");
+    } catch {
+      return {};
     }
+  });
 
-    // ✅ Normalize all fields - Now mapping over the 'videos' array
-    const normalizedVideos: VideoItem[] = result.videos.map((v: any) => ({
-      id: v.id || v._id || v.videoId,
-      title: v.title || v.name || v.filename || "Untitled Video",
-      filename: v.filename || v.title || "Untitled",
-      thumbnail:
-        v.thumbnail ||
-        v.thumb ||
-        // 🛑 IMPORTANT: Update thumbnail URL construction to include video ID in the path
-        (v.filename ? `${API_URL}/hls/thumbnails/${v.filename}/thumb_0001.jpg` : null),
-      thumbnails_base: v.thumbnails_base,
-      duration: v.duration || 0,
-      uploader: v.uploader || v.uploadedBy || v.uploader_email || "Unknown",
-      status: v.status || "ready",
-      // 🛑 IMPORTANT: Update video_url to use the HLS stream path with filename
-      video_url: v.video_url || v.url || `${API_URL}/hls/${v.filename}/master.m3u8`,
-    }));
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [upNextVisible, setUpNextVisible] = useState(false);
+  const [upNextCount, setUpNextCount] = useState(5);
 
-    setVideos(normalizedVideos);
+  // ---------------- FETCH VIDEOS ----------------
+  const fetchVideos = async () => {
+    try {
+      const res = await fetch(`${API_URL}/videos`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    setCurrentId((prev) => {
-      if (prev && normalizedVideos.some((v) => v.id === prev)) return prev;
-      const savedId = localStorage.getItem("lastVideoId");
-      if (savedId && normalizedVideos.some((v) => v.id === savedId))
-        return savedId;
-      return normalizedVideos[0]?.id || null;
-    });
-  } catch (e) {
-    console.error("❌ Error fetching videos:", e);
-    setToast({ message: "Failed to load videos", type: "error" });
-  }
-};
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
 
+      // Ensure correct structure
+      const arr = Array.isArray(result.videos) ? result.videos : [];
 
+      // Normalize data
+      const normalized: VideoItem[] = arr.map((v: any, i: number) => ({
+        id: v.id?.toString() || v._id || v.videoId || `vid-${i}`,
+        title: v.title || v.filename || "Untitled Video",
+        filename: v.filename,
+        thumbnail:
+          v.thumbnail ||
+          (v.filename
+            ? `${API_URL}/hls/thumbnails/${v.filename}/thumb_0001.jpg`
+            : null),
+        duration: v.duration || 0,
+        uploader: v.uploader || v.uploader_email || "Unknown",
+        status: v.status || "ready",
 
-  useEffect(() => {
-    fetchVideos();
-    const interval = setInterval(fetchVideos, 30000);
-    return () => clearInterval(interval);
-  }, [token]); // ✅ Refetch when token changes
+        // ⭐️ FIX: Normalize stream URL
+        video_url:
+          v.video_url ||
+          v.url ||
+          (v.filename
+            ? `${API_URL}/hls/${v.filename}/master.m3u8`
+            : undefined),
 
-  // ---------------- UPLOAD HANDLER ----------------
-  const handleUpload: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+        url:
+          v.video_url ||
+          v.url ||
+          (v.filename
+            ? `${API_URL}/hls/${v.filename}/master.m3u8`
+            : undefined),
 
-  setUploading(true);
-  setUploadProgress(0);
+        created_at: v.created_at || null,
+      }));
 
-  try {
-    const auth = getAuth();
-    const user = auth.currentUser;
-    const token = user ? await user.getIdToken() : null;
+      setVideos(normalized);
 
-    if (!token) {
-      setToast({ message: "Please login before uploading", type: "error" });
-      setUploading(false);
-      return;
-    }
+      // Preserve selected video
+      setCurrentId((prev) => {
+        if (prev && normalized.some((v) => v.id === prev)) return prev;
 
-    const formData = new FormData();
-    formData.append("file", file);
+        const saved = localStorage.getItem("lastVideoId");
+        if (saved && normalized.some((v) => v.id === saved)) return saved;
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_URL}/upload`, true);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`); // ✅ send token
+        return normalized[0]?.id || null;
+      });
+    } catch (err) {
+      console.error("❌ Error fetching videos:", err);
+      setToast({ message: "Failed to load videos", type: "error" });
+    }
+  };
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setUploadProgress(percent);
-      }
-    };
+  useEffect(() => {
+    fetchVideos();
+    const int = setInterval(fetchVideos, 30000);
+    return () => clearInterval(int);
+  }, [token]);
 
-    xhr.onload = async () => {
-      setUploading(false);
-      if (xhr.status === 200) {
-        setToast({ message: "✅ Upload complete! Processing started...", type: "success" });
-        await fetchVideos();
-      } else {
-        setToast({ message: `Upload failed: ${xhr.responseText}`, type: "error" });
-      }
-      e.target.value = "";
-    };
+  // ---------------- UPLOAD HANDLER ----------------
+  const handleUpload: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    xhr.onerror = () => {
-      setUploading(false);
-      setToast({ message: "Network error during upload", type: "error" });
-    };
+    setUploading(true);
+    setUploadProgress(0);
 
-    xhr.send(formData);
-  } catch (err) {
-    console.error("❌ Upload failed:", err);
-    setToast({ message: "Upload failed", type: "error" });
-    setUploading(false);
-  }
-};
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
 
-  // ---------------- LOCALSTORAGE SYNC ----------------
-  useEffect(() => {
-    if (currentId) localStorage.setItem("lastVideoId", currentId);
-  }, [currentId]);
+      if (!token) {
+        setToast({ message: "Please login", type: "error" });
+        setUploading(false);
+        return;
+      }
 
-  useEffect(() => {
-    localStorage.setItem("watchPos", JSON.stringify(watchPos));
-  }, [watchPos]);
+      const formData = new FormData();
+      formData.append("file", file);
 
-  useEffect(() => {
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${API_URL}/upload`, true);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
-  // ---------------- COMPUTED VALUES ----------------
-  const current = useMemo(
-    () => videos.find((v) => v.id === currentId) || null,
-    [videos, currentId]
-  );
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+        }
+      };
 
-  const currentVideo = useMemo(() => {
-    if (!current) return undefined;
-    return {
-      id: current.id,
-      title: current.title || current.filename || "Untitled Video",
-      url: current.video_url || current.url,
-      thumbnail: current.thumbnail,
-      savedPos: watchPos[current.id] || { t: 0, d: current.duration || 0 },
-    };
-  }, [current, watchPos]);
+      xhr.onload = async () => {
+        setUploading(false);
 
-  const currentIndex = useMemo(
-    () => (currentId ? videos.findIndex((v) => v.id === currentId) : -1),
-    [videos, currentId]
-  );
+        if (xhr.status === 200) {
+          setToast({ message: "Upload complete", type: "success" });
+          await fetchVideos();
+        } else {
+          setToast({ message: "Upload failed", type: "error" });
+        }
 
-  const nextVideo = useMemo(() => {
-    if (currentIndex < 0 || videos.length === 0) return null;
-    const idx = (currentIndex + 1) % videos.length;
-    return videos[idx];
-  }, [currentIndex, videos]);
+        e.target.value = "";
+      };
 
-  // ---------------- VIDEO END / "UP NEXT" ----------------
-  const handleEnded = () => {
-    if (!autoplayNext || !nextVideo) return;
-    setUpNextVisible(true);
-    setUpNextCount(5);
+      xhr.onerror = () => {
+        setUploading(false);
+        setToast({ message: "Network error", type: "error" });
+      };
 
-    // Send analytics for "ended"
-    sendAnalytics("ended", currentVideo?.id);
-  };
+      xhr.send(formData);
+    } catch (err) {
+      console.error(err);
+      setToast({ message: "Upload failed", type: "error" });
+      setUploading(false);
+    }
+  };
 
-  useEffect(() => {
-    if (!upNextVisible || !autoplayNext) return;
-    const timer = setInterval(() => {
-      setUpNextCount((c) => {
-        if (c <= 1) {
-          clearInterval(timer);
-          if (nextVideo) setCurrentId(nextVideo.id);
-          setUpNextVisible(false);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [upNextVisible, autoplayNext, nextVideo]);
+  // ---------------- SYNC LOCAL STORAGE ----------------
+  useEffect(() => {
+    if (currentId) localStorage.setItem("lastVideoId", currentId);
+  }, [currentId]);
 
-  // ---------------- ANALYTICS ----------------
-  const sendAnalytics = async (event: string, videoId?: string) => {
-    if (!videoId || !token) return;
-    try {
-      await fetch(`${API_URL}/api/analytics/track`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ videoId, event }),
-      });
-    } catch (err) {
-      console.warn("⚠️ Analytics send failed:", err);
-    }
-  };
+  useEffect(() => {
+    localStorage.setItem("watchPos", JSON.stringify(watchPos));
+  }, [watchPos]);
 
-  // Track when video starts
-  useEffect(() => {
-    if (currentVideo?.id) sendAnalytics("play", currentVideo.id);
-  }, [currentVideo?.id]);
+  useEffect(() => {
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
-  // ---------------- THEME CLASS ----------------
-const themeCls = {
-  page: theme === "dark" ? "bg-[#0d0d0d]" : "bg-[#090015]",
-  panel: theme === "dark" ? "bg-[#111]" : "bg-[#140028]",
-  pill: theme === "dark" ? "bg-white/10" : "bg-pink-600/40",
-  accent: theme === "dark" ? "text-white" : "text-pink-400",
-};
-  // ---------------- RETURN EVERYTHING ----------------
-  return {
-    videos,
-    currentVideo,
-    nextVideo,
-    handleUpload,
-    uploading,
-    uploadProgress,
-    toast,
-    setToast,
-    q,
-    setQ,
-    theme,
-    setTheme,
-    themeCls,
-    fileInputRef,
-    isFullscreen,
-    setIsFullscreen,
-    handleEnded,
-    upNextVisible,
-    upNextCount,
-    setUpNextVisible,
-    autoplayNext,
-    setAutoplayNext,
-    current,
-    currentId,
-    setCurrentId,
-    watchPos,
-    setWatchPos,
-  };
+  // ---------------- COMPUTED VALUES ----------------
+  const current = useMemo(
+    () => videos.find((v) => v.id === currentId) || null,
+    [videos, currentId]
+  );
+
+  const currentVideo = useMemo(() => {
+    if (!current) return undefined;
+
+    return {
+      id: current.id,
+      title: current.title,
+      url: current.video_url || current.url,
+      thumbnail: current.thumbnail,
+      savedPos: watchPos[current.id] || { t: 0, d: current.duration },
+    };
+  }, [current, watchPos]);
+
+  const currentIndex = videos.findIndex((v) => v.id === currentId);
+
+  const nextVideo =
+    currentIndex >= 0 ? videos[(currentIndex + 1) % videos.length] : null;
+
+  // ---------------- RETURN ----------------
+  return {
+    videos,
+    currentVideo,
+    nextVideo,
+    handleUpload,
+    uploading,
+    uploadProgress,
+    toast,
+    setToast,
+    q,
+    setQ,
+    theme,
+    setTheme,
+    themeCls: {
+      page: theme === "dark" ? "bg-[#0d0d0d]" : "bg-[#090015]",
+      panel: theme === "dark" ? "bg-[#111]" : "bg-[#140028]",
+      pill: theme === "dark" ? "bg-white/10" : "bg-pink-600/40",
+      accent: theme === "dark" ? "text-white" : "text-pink-400",
+    },
+    fileInputRef,
+    isFullscreen,
+    setIsFullscreen,
+    upNextVisible,
+    upNextCount,
+    setUpNextVisible,
+    autoplayNext,
+    setAutoplayNext,
+    current,
+    currentId,
+    setCurrentId,
+    watchPos,
+    setWatchPos,
+  };
 }
-
