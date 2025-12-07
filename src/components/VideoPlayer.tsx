@@ -19,12 +19,9 @@ import Hls from "hls.js";
 
 export type Chapter = { time: number; title: string };
 
-export type VideoMeta = {
-  id?: string; // ⭐ FIX ADDED
-  url: string;
-  title?: string;
-  poster?: string;
-  thumbnails_base?: string;
+export type VideoMeta = VideoItem & {
+  url: string;        // override for player
+  poster?: string;    // thumbnail preview
 };
 
 export type PlayerHandle = {
@@ -345,3 +342,4 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(
 );
 
 export default VideoPlayer;
+
