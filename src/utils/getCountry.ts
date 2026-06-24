@@ -1,12 +1,25 @@
-// src/utils/getCountry.ts
 export async function getCountryCode(): Promise<string> {
   try {
-    // Cloudflare edge service gives fast country detection
     const res = await fetch("https://ipapi.co/country/", { cache: "no-store" });
-    if (!res.ok) return "US"; // fallback
+    if (!res.ok) throw new Error("Primary service failed");
     const code = await res.text();
     return code.trim().toUpperCase();
   } catch {
-    return "US"; // fallback
+    // Fallback to Cloudflare trace
+    try {
+      const res = await fetch("https://www.cloudflare.com/cdn-cgi/trace");
+      const data = await res.text();
+      const match = data.match(/loc=([A-Z]{2})/);
+      if (match) return match[1];
+    } catch {}
+    return "US";
   }
 }
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), 3000);
+const res = await fetch("https://ipapi.co/country/", { 
+  cache: "no-store",
+  signal: controller.signal 
+});
+clearTimeout(timeout);
+

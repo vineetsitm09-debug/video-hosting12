@@ -11,8 +11,7 @@ interface AuthContextProps {
   logout: () => void;
 }
 
-// ⭐ FIX: Export AuthContext
-export const AuthContext = createContext<AuthContextProps>({
+const AuthContext = createContext<AuthContextProps>({
   user: null,
   token: null,
   login: () => {},
@@ -29,36 +28,50 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
+  // Listen for Firebase auth state
   useEffect(() => {
+    let tokenRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Clear any existing refresh interval when auth state changes
+      if (tokenRefreshInterval) {
+        clearInterval(tokenRefreshInterval);
+        tokenRefreshInterval = null;
+      }
+
       setUser(firebaseUser);
 
       if (firebaseUser) {
+        // 🧠 Get token and refresh it automatically
         const idToken = await getIdToken(firebaseUser, true);
         setToken(idToken);
 
-        setInterval(async () => {
-          const refreshedToken = await getIdToken(firebaseUser, true);
-          setToken(refreshedToken);
+        // Refresh every 55 minutes (Firebase tokens expire ~1 hour)
+        tokenRefreshInterval = setInterval(async () => {
+          try {
+            const refreshedToken = await getIdToken(firebaseUser, true);
+            setToken(refreshedToken);
+          } catch (err) {
+            console.error("Failed to refresh token:", err);
+          }
         }, 55 * 60 * 1000);
       } else {
         setToken(null);
       }
     });
 
-    return () => unsub();
+    return () => {
+      unsub();
+      if (tokenRefreshInterval) {
+        clearInterval(tokenRefreshInterval);
+      }
+    };
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        login: signInWithGoogle,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{ user, token, login: signInWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
+

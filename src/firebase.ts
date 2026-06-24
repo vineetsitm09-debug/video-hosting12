@@ -1,17 +1,20 @@
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { ENV } from "./utils/env";
 
-// 🔹 Use your Firebase SDK config here
+// Firebase configuration - uses centralized ENV from utils/env.ts
 const firebaseConfig = {
-  apiKey: "AIzaSyCzVSP_hSQV3px36LwrcIrdKskbYCbkXo8",
-  authDomain: "streamlite-6814b.firebaseapp.com",
-  projectId: "streamlite-6814b",
-  storageBucket: "streamlite-6814b.firebasestorage.app",
-  messagingSenderId: "64626871662",
-  appId: "1:64626871662:web:4083e55f3c394cb0d8c57f",
-  measurementId: "G-VV3V9GCKC3"
+  apiKey: ENV.FIREBASE_API_KEY,
+  authDomain: ENV.FIREBASE_AUTH_DOMAIN,
+  projectId: ENV.FIREBASE_PROJECT_ID,
+  storageBucket: ENV.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: ENV.FIREBASE_MESSAGING_SENDER_ID,
+  appId: ENV.FIREBASE_APP_ID,
+  measurementId: ENV.FIREBASE_MEASUREMENT_ID
 };
+
+// Validation is now done in main.tsx via validateEnv()
 
 const app = initializeApp(firebaseConfig);
 
@@ -22,3 +25,4 @@ export const googleProvider = new GoogleAuthProvider();
 // Functions
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
 export const logout = () => signOut(auth);
+

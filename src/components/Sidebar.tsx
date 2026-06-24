@@ -1,60 +1,90 @@
-import React from "react";
-import { Home, Flame, Library, Settings } from "lucide-react";
-import { NavLink } from "react-router-dom";
+// ============================================================
+// Sidebar.tsx — Desktop navigation sidebar
+// ============================================================
 
-type SideItemProps = {
-  icon: React.ReactNode;
+import React from "react";
+import {
+  Home, Flame, Library, Settings, History, PlaySquare,
+  ThumbsUp, Clock, TrendingUp, Compass, Video, ChevronRight,
+  type LucideProps,
+} from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { motion } from "framer-motion";
+
+// ─────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────
+
+type IconComponent = React.ComponentType<LucideProps>;
+
+interface SideItemProps {
+  icon: IconComponent;
   label: string;
   to: string;
-};
+  badge?: number;
+}
 
-function SideItem({ icon, label, to }: SideItemProps) {
+function SideItem({ icon: Icon, label, to, badge }: SideItemProps) {
   return (
     <li>
       <NavLink
         to={to}
+        aria-label={label}
         className={({ isActive }) =>
-          `w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 ${
-            isActive
-              ? "bg-gray-900 text-red-500 font-semibold"
-              : "text-gray-300 hover:bg-gray-800 hover:text-white"
+          `group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${isActive
+            ? "bg-gradient-to-r from-red-500/20 to-red-600/20 text-red-400 shadow-lg shadow-red-500/10 border border-red-500/30"
+            : "text-gray-300 hover:bg-red-500/5 hover:text-red-400 border border-transparent"
           }`
         }
-        aria-label={label}
       >
-        {icon}
-        <span className="text-sm">{label}</span>
+        {({ isActive }) => (
+          <>
+            <span className={`transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110"}`}>
+              <Icon size={20} />
+            </span>
+            <span className="text-sm font-medium flex-1">{label}</span>
+            {badge != null && badge > 0 && (
+              <span className="px-2 py-0.5 bg-red-500 text-black text-xs font-bold rounded-full shadow-lg shadow-red-500/50">
+                {badge > 99 ? "99+" : badge}
+              </span>
+            )}
+            {isActive && (
+              <motion.div
+                layoutId="sidebar-active"
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-red-500 to-red-600 rounded-r-full shadow-lg shadow-red-500/50"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+            )}
+            <ChevronRight
+              className={`w-4 h-4 transition-all duration-300 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0"
+                }`}
+            />
+          </>
+        )}
       </NavLink>
     </li>
   );
 }
 
-export default function Sidebar({ themeCls }: { themeCls: any }) {
+// ─────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────
+
+interface SidebarProps {
+  themeCls: { panel: string };
+}
+
+export default function Sidebar({ themeCls }: SidebarProps) {
   return (
-    <aside className="hidden md:block w-60">
-      <nav
-        role="navigation"
-        className={`h-full rounded-2xl border border-white/10 shadow-md overflow-hidden bg-black/90 ${themeCls.panel}`}
-      >
-        <ul className="p-3 space-y-1">
-          <SideItem icon={<Home className="w-5 h-5" />} label="Home" to="/" />
-          <SideItem
-            icon={<Flame className="w-5 h-5" />}
-            label="Trending"
-            to="/trending"
-          />
-          <SideItem
-            icon={<Library className="w-5 h-5" />}
-            label="Library"
-            to="/library"
-          />
-          <SideItem
-            icon={<Settings className="w-5 h-5" />}
-            label="Settings"
-            to="/settings"
-          />
-        </ul>
-      </nav>
+    <aside className="hidden md:block w-64 sticky top-[73px] h-[calc(100vh-73px)] overflow-y-auto sidebar-scroll">
+
+      <style>{`
+        .sidebar-scroll::-webkit-scrollbar       { width: 6px; }
+        .sidebar-scroll::-webkit-scrollbar-track  { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb  { background: rgba(239,68,68,0.3); border-radius: 10px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(239,68,68,0.5); }
+      `}</style>
     </aside>
   );
 }
+

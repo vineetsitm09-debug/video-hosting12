@@ -1,70 +1,129 @@
-// src/components/VideoPlayer/usePlayer.ts
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import Hls, { Level } from "hls.js";
+// ============================================================
+// usePlayer.ts — HLS video player hook
+// ============================================================
 
-// Clamp helper
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import Hls, { type Level } from "hls.js";
+
+// ─────────────────────────────────────────────
+// Constants & helpers
+// ─────────────────────────────────────────────
+
+const DEFAULT_VOLUME = 0.5;
+
 const clamp = (n: number, min = 0, max = 1) => Math.min(max, Math.max(min, n));
 
-// FIXED IMPORT ⬇️  
-import type { VideoMeta } from "./VideoPlayer";
+const getSavedVolume = (): number => {
+  const v = parseFloat(localStorage.getItem("player_volume") ?? "");
+  return isNaN(v) ? DEFAULT_VOLUME : clamp(v);
+};
+
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+
+interface VideoSource {
+  url:     string;
+  id?:     string;
+  poster?: string;
+}
+
+interface PlayerState {
+  isPlaying:    boolean;
+  isBuffering:  boolean;
+  duration:     number;
+  currentTime:  number;
+  buffered:     number;
+  volume:       number;
+  isMuted:      boolean;
+  levels:       Level[];
+  currentLevel: number | "auto";
+}
+
+interface PlayerActions {
+  play:         () => void;
+  pause:        () => void;
+  playPause:    () => void;
+  seekBy:       (delta: number) => void;
+  seekAbs:      (t: number) => void;
+  setVolume:    (v: number) => void;
+  toggleMute:   () => void;
+  changeQuality:(lvl: number | "auto") => void;
+}
+
+interface UsePlayerReturn {
+  vRef:    React.RefObject<HTMLVideoElement | null>;
+  state:   PlayerState;
+  actions: PlayerActions;
+}
+
+interface UsePlayerOptions {
+  video:      VideoSource | null | undefined;
+  autoPlay?:  boolean;
+  startTime?: number;
+}
+
+// ─────────────────────────────────────────────
+// Hook
+// ─────────────────────────────────────────────
 
 export default function usePlayer({
   video,
-  autoPlay = true,
+  autoPlay  = true,
   startTime = 0,
-}: {
-  video: VideoMeta;
-  autoPlay?: boolean;
-  startTime?: number;
-}) {
-  const vRef = useRef<HTMLVideoElement>(null);
+}: UsePlayerOptions): UsePlayerReturn {
+  const vRef   = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(true);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
-  const [levels, setLevels] = useState<Level[]>([]);
+  const [isPlaying,    setIsPlaying]    = useState(false);
+  const [isBuffering,  setIsBuffering]  = useState(true);
+  const [duration,     setDuration]     = useState(0);
+  const [currentTime,  setCurrentTime]  = useState(0);
+  const [buffered,     setBuffered]     = useState(0);
+  const [volume,       setVolumeState]  = useState(getSavedVolume);
+  const [isMuted,      setIsMuted]      = useState(false);
+  const [levels,       setLevels]       = useState<Level[]>([]);
   const [currentLevel, setCurrentLevel] = useState<number | "auto">("auto");
-  const [subtitles, setSubtitles] = useState<{ id: number; label: string }[]>([]);
-  const [currentSubtitle, setCurrentSubtitle] =
-    useState<number | "off">("off");
 
-  // ---- Basic controls ----
-  const play = useCallback(async () => {
-    const el = vRef.current;
-    if (el) await el.play().catch(() => {});
-  }, []);
+  // ── Controls ──────────────────────────────
 
+  const play = useCallback(() => { vRef.current?.play().catch(() => {}); }, []);
   const pause = useCallback(() => vRef.current?.pause(), []);
 
   const playPause = useCallback(() => {
-    const v = vRef.current;
-    if (!v) return;
-    v.paused ? v.play() : v.pause();
+    const el = vRef.current;
+    if (!el) return;
+    el.paused ? el.play().catch(() => {}) : el.pause();
   }, []);
 
   const seekBy = useCallback((delta: number) => {
-    const v = vRef.current;
-    if (!v) return;
-    v.currentTime = clamp(v.currentTime + delta, 0, v.duration);
+    const el = vRef.current;
+    if (!el) return;
+    el.currentTime = clamp(el.currentTime + delta, 0, el.duration);
   }, []);
 
   const seekAbs = useCallback((t: number) => {
-    const v = vRef.current;
-    if (v) v.currentTime = clamp(t, 0, v.duration);
+    const el = vRef.current;
+    if (el) el.currentTime = clamp(t, 0, el.duration);
   }, []);
 
-  const toggleMute = useCallback(() => setIsMuted((m) => !m), []);
-
-  const setVol = useCallback((v: number) => {
+  const setVolume = useCallback((v: number) => {
     const el = vRef.current;
     if (!el) return;
-    el.volume = clamp(v, 0, 1);
-    setVolume(v);
+    const vol = clamp(v);
+    el.volume = vol;
+    el.muted  = vol === 0;
+    localStorage.setItem("player_volume", vol.toString());
+    setVolumeState(vol);
+    setIsMuted(vol === 0);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const el = vRef.current;
+    if (!el) return;
+    const next = !el.muted;
+    el.muted = next;
+    setIsMuted(next);
   }, []);
 
   const changeQuality = useCallback((lvl: number | "auto") => {
@@ -74,88 +133,77 @@ export default function usePlayer({
     setCurrentLevel(lvl);
   }, []);
 
-  const setSubtitle = useCallback((id: number | "off") => {
-    const hls = hlsRef.current;
-    if (!hls) return;
-    hls.subtitleTrack = id === "off" ? -1 : id;
-    setCurrentSubtitle(id);
+  // ── Volume restore on mount ───────────────
+
+  useEffect(() => {
+    const el = vRef.current;
+    if (!el) return;
+    const vol = getSavedVolume();
+    el.volume = vol;
+    el.muted  = false;
+    setVolumeState(vol);
+    setIsMuted(false);
   }, []);
 
-  // ---- HLS Setup ----
+  // ── HLS / video source loading ────────────
+
   useEffect(() => {
     const el = vRef.current;
     if (!el || !video?.url) return;
 
+    // Tear down any existing HLS instance
     if (hlsRef.current) {
-      try {
-        hlsRef.current.destroy();
-      } catch {}
+      try { hlsRef.current.destroy(); } catch {}
+      hlsRef.current = null;
     }
-    hlsRef.current = null;
+
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
 
     setIsBuffering(true);
     setLevels([]);
-    setSubtitles([]);
+    setCurrentLevel("auto");
 
-    el.muted = isMuted;
-    el.volume = volume;
-
-    const safeStart = () => {
+    const startPlay = () => {
       if (startTime > 0) el.currentTime = startTime;
-      if (autoPlay) el.play().catch(() => {});
+      if (!autoPlay) return;
+      el.play().catch(() => {
+        el.muted = true;
+        setIsMuted(true);
+        el.play().catch(() => {});
+      });
     };
 
+    // Native HLS support (Safari / iOS)
     if (el.canPlayType("application/vnd.apple.mpegurl")) {
       el.src = video.url;
-      el.addEventListener("loadedmetadata", safeStart);
-      return () => el.removeEventListener("loadedmetadata", safeStart);
+      el.addEventListener("loadedmetadata", startPlay, { once: true });
+      return;
     }
 
+    // HLS.js
     if (video.url.endsWith(".m3u8") && Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 0,
-      });
+      const hls = new Hls({ enableWorker: true });
       hlsRef.current = hls;
-
       hls.attachMedia(el);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource(video.url);
-      });
-
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(video.url));
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setLevels(hls.levels || []);
-        safeStart();
+        setLevels(hls.levels);
+        startPlay();
       });
-
-      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
-        setSubtitles(
-          data.subtitleTracks.map((t: any, i: number) => ({
-            id: i,
-            label: t.name || `Subtitle ${i + 1}`,
-          }))
-        );
-      });
-
       return () => {
-        try {
-          hls.destroy();
-        } catch {}
+        try { hls.destroy(); } catch {}
       };
     }
 
+    // Fallback: plain src
     el.src = video.url;
-    safeStart();
+    startPlay();
+  }, [video?.url, autoPlay, startTime]);
 
-    return () => {
-      try {
-        el.pause();
-      } catch {}
-    };
-  }, [video?.url, autoPlay, startTime, isMuted, volume]);
+  // ── Media event listeners ─────────────────
 
-  // ---- Track timing updates ----
   useEffect(() => {
     const el = vRef.current;
     if (!el) return;
@@ -169,79 +217,37 @@ export default function usePlayer({
       } catch {}
     };
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay    = () => setIsPlaying(true);
+    const onPause   = () => setIsPlaying(false);
     const onWaiting = () => setIsBuffering(true);
     const onPlaying = () => setIsBuffering(false);
 
     el.addEventListener("timeupdate", update);
-    el.addEventListener("play", onPlay);
-    el.addEventListener("pause", onPause);
-    el.addEventListener("waiting", onWaiting);
-    el.addEventListener("playing", onPlaying);
+    el.addEventListener("play",       onPlay);
+    el.addEventListener("pause",      onPause);
+    el.addEventListener("waiting",    onWaiting);
+    el.addEventListener("playing",    onPlaying);
 
     return () => {
       el.removeEventListener("timeupdate", update);
-      el.removeEventListener("play", onPlay);
-      el.removeEventListener("pause", onPause);
-      el.removeEventListener("waiting", onWaiting);
-      el.removeEventListener("playing", onPlaying);
+      el.removeEventListener("play",       onPlay);
+      el.removeEventListener("pause",      onPause);
+      el.removeEventListener("waiting",    onWaiting);
+      el.removeEventListener("playing",    onPlaying);
     };
-  }, [video?.url]);
+  }, []);
 
-  const state = useMemo(
-    () => ({
-      isPlaying,
-      isBuffering,
-      duration,
-      currentTime,
-      buffered,
-      volume,
-      isMuted,
-      levels,
-      currentLevel,
-      subtitles,
-      currentSubtitle,
-    }),
-    [
-      isPlaying,
-      isBuffering,
-      duration,
-      currentTime,
-      buffered,
-      volume,
-      isMuted,
-      levels,
-      currentLevel,
-      subtitles,
-      currentSubtitle,
-    ]
-  );
+  // ── Memoised state & actions ──────────────
 
-  const actions = useMemo(
-    () => ({
-      play,
-      pause,
-      playPause,
-      seekBy,
-      seekAbs,
-      toggleMute,
-      setVolume: setVol,
-      changeQuality,
-      setSubtitle,
-    }),
-    [
-      play,
-      pause,
-      playPause,
-      seekBy,
-      seekAbs,
-      toggleMute,
-      setVol,
-      changeQuality,
-      setSubtitle,
-    ]
-  );
+  const state = useMemo<PlayerState>(() => ({
+    isPlaying, isBuffering, duration, currentTime, buffered,
+    volume, isMuted, levels, currentLevel,
+  }), [isPlaying, isBuffering, duration, currentTime, buffered, volume, isMuted, levels, currentLevel]);
+
+  const actions = useMemo<PlayerActions>(() => ({
+    play, pause, playPause, seekBy, seekAbs, setVolume, toggleMute, changeQuality,
+  }), [play, pause, playPause, seekBy, seekAbs, setVolume, toggleMute, changeQuality]);
 
   return { vRef, state, actions };
 }
+
